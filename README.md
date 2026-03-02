@@ -1,6 +1,5 @@
-# Getting Started with Create React App
+# This is a prototype for the behavoirs mentrioned in [this](https://ics-websites.science.uu.nl/docs/vakken/mcrws/papers_new/Helbing_Molnar%20-%201995%20-%20Social%20force%20model%20for%20pedestrian%20dynamics.pdf) paper from Helbing Molnar (1995) about the Social force model for pedestrian dynamics
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 ## Available Scripts
 
@@ -39,7 +38,7 @@ Instead, it will copy all the configuration files and the transitive dependencie
 
 You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
-## Learn More
+#### Learn More
 
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
