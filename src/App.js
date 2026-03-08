@@ -425,12 +425,12 @@ const App = () =>
       </header>
 
       <div className="flex flex-col lg:flex-row gap-8 h-full overflow-hidden">
-        <div className="flex-1 bg-white rounded-2xl shadow-xl p-4 border border-slate-100 flex items-center justify-center relative overflow-hidden">
+        <div className="flex-1 min-h-[50vh] lg:min-h-0 bg-white rounded-2xl shadow-xl p-4 border border-slate-100 flex items-center justify-center relative overflow-hidden">
           <canvas
             ref={canvasRef}
             width={800}
             height={400}
-            className="max-w-full h-auto bg-white rounded border border-slate-200"
+            className="w-full h-full lg:h-auto bg-white rounded border border-slate-200"
           />
         </div>
 
@@ -469,7 +469,7 @@ const App = () =>
 
               {(activeMap === 'narrow' || activeMap === 'crossing') && (
                 <div>
-                  <label className="text-sm flex justify-between items-center mb-1">
+                  <label className="text-sm flex items-center mb-1">
                     Corridor Width: <span>{envParams.corridorWidth}px</span>
                   </label>
                   <input type="range" min="20" max="150" step="5" value={envParams.corridorWidth}
@@ -481,7 +481,7 @@ const App = () =>
 
               {activeMap === 'centerWall' && (
                 <div>
-                  <label className="text-sm flex justify-between items-center mb-1">
+                  <label className="text-sm flex items-center mb-1">
                     Slit Width: <span>{envParams.slitWidth}px</span>
                   </label>
                   <input type="range" min="20" max="200" step="5" value={envParams.slitWidth}
@@ -492,7 +492,7 @@ const App = () =>
               )}
 
               <div>
-                <label className="text-sm flex justify-between items-center mb-1">
+                <label className="text-sm flex items-center mb-1">
                   Agent Count:
                 </label>
                 <div className="flex items-center gap-2">
@@ -514,7 +514,7 @@ const App = () =>
 
             <div className="space-y-4">
               <div>
-                <label className="text-sm flex justify-between">
+                <label className="text-sm flex">
                   Relaxation (<InlineMath math="\\tau" />): <span>{params.tau}s</span>
                 </label>
                 <input type="range" min="0.1" max="2" step="0.1" value={params.tau}
@@ -524,7 +524,7 @@ const App = () =>
               </div>
 
               <div>
-                <label className="text-sm flex justify-between">
+                <label className="text-sm flex">
                   Repulsion Strength (<InlineMath math="V^0_{ab}" />): <span>{params.V0_ab}</span>
                 </label>
                 <input type="range" min="0" max="10" step="0.5" value={params.V0_ab}
@@ -534,7 +534,7 @@ const App = () =>
               </div>
 
               <div>
-                <label className="text-sm flex justify-between">
+                <label className="text-sm flex">
                   Wall Strength (<InlineMath math="U^0_{aB}" />): <span>{params.U0_aB}</span>
                 </label>
                 <input type="range" min="0" max="30" step="1" value={params.U0_aB}
@@ -544,7 +544,7 @@ const App = () =>
               </div>
 
               <div>
-                <label className="text-sm flex justify-between">
+                <label className="text-sm flex">
                   Desired Speed (<InlineMath math="v^0_{\\alpha}" />): <span>{params.v0} m/s</span>
                 </label>
                 <input type="range" min="0.5" max="3.0" step="0.1" value={params.v0}
@@ -554,7 +554,7 @@ const App = () =>
               </div>
 
               <div>
-                <label className="text-sm flex justify-between">
+                <label className="text-sm flex">
                   Rear Perception (<InlineMath math="c" />): <span>{params.c}</span>
                 </label>
                 <p className="text-xs text-slate-400 mb-1">Influence weight for stimuli outside the field of view (0 = ignore, 1 = full)</p>
