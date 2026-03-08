@@ -545,7 +545,7 @@ const App = () =>
 
               <div>
                 <label className="text-sm flex justify-between">
-                  Desired Speed (<InlineMath math="v^0_\\alpha" />): <span>{params.v0} m/s</span>
+                  Desired Speed (<InlineMath math="v^0_{\\alpha}" />): <span>{params.v0} m/s</span>
                 </label>
                 <input type="range" min="0.5" max="3.0" step="0.1" value={params.v0}
                   onChange={e => setParams({ ...params, v0: parseFloat(e.target.value) })}
