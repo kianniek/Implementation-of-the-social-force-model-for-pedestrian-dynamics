@@ -1,31 +1,38 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { Settings, Play, Pause, RotateCcw, Users, Wall, Info, Map as MapIcon, Maximize2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Settings, Play, Pause, RotateCcw, Users, Info, Map as MapIcon } from 'lucide-react';
 import { InlineMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
+
+const AGENT_RADIUS = 7;
+const AGENT_DIAMETER = AGENT_RADIUS * 2;
+const positivePart = (value) => (value > 0 ? value : 0);
+const vectorMagnitude = (vector) => Math.sqrt(vector.x * vector.x + vector.y * vector.y);
 
 const App = () =>
 {
   const canvasRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [showVectors, setShowVectors] = useState(false);
-  const [agentCount, setAgentCount] = useState(20);
+  const [agentCount, setAgentCount] = useState(48);
 
-  const [activeMap, setActiveMap] = useState('narrow');
+  const [activeMap, setActiveMap] = useState('centerWall');
   const [envParams, setEnvParams] = useState({
     corridorWidth: 60,
-    slitWidth: 60,
+    slitWidth: 40,
   });
 
   const [params, setParams] = useState({
     tau: 0.5,
     v0: 1.34,
     v0_std: 0.26,
-    V0_ab: 2.1,
+    V0_ab: 10,
     sigma: 0.3,
-    U0_aB: 10.0,
+    U0_aB: 12,
     R: 0.2,
     c: 0.5,
     phi: 100,
+    bodyStiffness: 30,
+    friction: 20,
     maxSpeedMultiplier: 1.3,
     dt: 0.05
   });
@@ -46,7 +53,6 @@ const App = () =>
   const initSimulation = () =>
   {
     const width = 800;
-    const height = 400;
 
     updateWalls();
 
@@ -86,7 +92,7 @@ const App = () =>
 
     const direction = id % 2 === 0 ? 1 : -1;
     const x = direction === 1 ? Math.random() * 150 : width - Math.random() * 150;
-    const y = 120 + Math.random() * 160;
+    const y = activeMap === 'centerWall' ? 140 + Math.random() * 120 : 120 + Math.random() * 160;
 
     return {
       id: id,
@@ -216,7 +222,9 @@ const App = () =>
         dy = 200 - a.pos.y;
       }
       const distToTarget = Math.sqrt(dx * dx + dy * dy);
-      const e = { x: dx / distToTarget, y: dy / distToTarget };
+      const e = distToTarget > 0.0001
+        ? { x: dx / distToTarget, y: dy / distToTarget }
+        : { x: a.axis === 'x' ? a.direction : 0, y: a.axis === 'y' ? a.direction : 0 };
 
       const f_target = {
         x: (1 / params.tau) * (a.desiredSpeed * e.x - a.vel.x),
@@ -230,18 +238,26 @@ const App = () =>
       {
         if (a.id === b.id) return;
         const rab = { x: a.pos.x - b.pos.x, y: a.pos.y - b.pos.y };
-        const dist = Math.sqrt(rab.x * rab.x + rab.y * rab.y);
+        const dist = vectorMagnitude(rab);
         if (dist === 0 || dist > 100) return;
 
-        const strength = params.V0_ab * Math.exp(-dist / (params.sigma * 20));
-        const forceDir = { x: rab.x / dist, y: rab.y / dist };
-        const dot = (forceDir.x * -a.vel.x + forceDir.y * -a.vel.y);
-        const velMag = Math.sqrt(a.vel.x ** 2 + a.vel.y ** 2);
-        const cosPhi = Math.cos((params.phi * Math.PI) / 180);
-        const weight = (velMag === 0 || dot >= velMag * cosPhi) ? 1.0 : params.c;
+        const normal = { x: rab.x / dist, y: rab.y / dist };
+        const tangent = { x: -normal.y, y: normal.x };
+        const overlap = positivePart(AGENT_DIAMETER - dist);
 
-        f_social.x += strength * forceDir.x * weight;
-        f_social.y += strength * forceDir.y * weight;
+        const anisotropicCosine = Math.max(-1, Math.min(1, -(e.x * normal.x + e.y * normal.y)));
+        const anisotropicWeight = params.c + (1 - params.c) * (1 + anisotropicCosine) * 0.5;
+
+        const socialRange = Math.max(1, params.sigma * 20);
+        const socialStrength = params.V0_ab * Math.exp((AGENT_DIAMETER - dist) / socialRange);
+        const bodyForce = params.bodyStiffness * overlap;
+        const deltaTangentialVelocity =
+          (b.vel.x - a.vel.x) * tangent.x +
+          (b.vel.y - a.vel.y) * tangent.y;
+        const slidingFriction = params.friction * overlap * deltaTangentialVelocity;
+
+        f_social.x += (socialStrength * anisotropicWeight + bodyForce) * normal.x + slidingFriction * tangent.x;
+        f_social.y += (socialStrength * anisotropicWeight + bodyForce) * normal.y + slidingFriction * tangent.y;
       });
       totalForce.x += f_social.x;
       totalForce.y += f_social.y;
@@ -256,12 +272,21 @@ const App = () =>
         t = Math.max(0, Math.min(1, t));
         const proj = { x: w.x1 + t * dxW, y: w.y1 + t * dyW };
         const vecToAgent = { x: a.pos.x - proj.x, y: a.pos.y - proj.y };
-        const dist = Math.sqrt(vecToAgent.x * vecToAgent.x + vecToAgent.y * vecToAgent.y);
+        const dist = vectorMagnitude(vecToAgent);
 
-        if (dist > 0 && dist < 50) {
-          const strength = params.U0_aB * Math.exp(-dist / (params.R * 20));
-          f_wall.x += strength * (vecToAgent.x / dist);
-          f_wall.y += strength * (vecToAgent.y / dist);
+        if (dist > 0 && dist < 60) {
+          const normal = { x: vecToAgent.x / dist, y: vecToAgent.y / dist };
+          const tangent = { x: -normal.y, y: normal.x };
+          const overlap = positivePart(AGENT_RADIUS - dist);
+
+          const wallRange = Math.max(1, params.R * 20);
+          const wallSocial = params.U0_aB * Math.exp((AGENT_RADIUS - dist) / wallRange);
+          const wallBody = params.bodyStiffness * overlap;
+          const tangentialSpeed = a.vel.x * tangent.x + a.vel.y * tangent.y;
+          const wallFriction = -params.friction * overlap * tangentialSpeed;
+
+          f_wall.x += (wallSocial + wallBody) * normal.x + wallFriction * tangent.x;
+          f_wall.y += (wallSocial + wallBody) * normal.y + wallFriction * tangent.y;
         }
       });
       totalForce.x += f_wall.x;
@@ -272,7 +297,7 @@ const App = () =>
         y: a.vel.y + totalForce.y * params.dt
       };
 
-      const currentSpeed = Math.sqrt(nextVel.x ** 2 + nextVel.y ** 2);
+      const currentSpeed = vectorMagnitude(nextVel);
       const limit = a.desiredSpeed * params.maxSpeedMultiplier;
       if (currentSpeed > limit) {
         nextVel.x = (nextVel.x / currentSpeed) * limit;
@@ -294,6 +319,27 @@ const App = () =>
 
       return { ...a, pos: nextPos, vel: nextVel, forces: { social: f_social, wall: f_wall, target: f_target } };
     });
+
+    for (let i = 0; i < newAgents.length; i++) {
+      for (let j = i + 1; j < newAgents.length; j++) {
+        const a = newAgents[i];
+        const b = newAgents[j];
+        const dx = b.pos.x - a.pos.x;
+        const dy = b.pos.y - a.pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist === 0 || dist >= AGENT_DIAMETER) continue;
+
+        const overlap = AGENT_DIAMETER - dist;
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const push = overlap / 2;
+
+        a.pos.x -= nx * push;
+        a.pos.y -= ny * push;
+        b.pos.x += nx * push;
+        b.pos.y += ny * push;
+      }
+    }
 
     agentsRef.current = newAgents;
   };
@@ -330,7 +376,7 @@ const App = () =>
       {
         ctx.fillStyle = a.color;
         ctx.beginPath();
-        ctx.arc(a.pos.x, a.pos.y, 7, 0, Math.PI * 2);
+        ctx.arc(a.pos.x, a.pos.y, AGENT_RADIUS, 0, Math.PI * 2);
         ctx.fill();
 
         if (showVectors) {
@@ -538,7 +584,7 @@ const App = () =>
             </h3>
             <p className="text-xs text-blue-700 leading-relaxed">
               Adjusting <strong>Agent Count</strong> now adds or removes agents without resetting the whole scene.
-              <strong>Narrow Corridor</strong> width changes will still reset the scene to ensure correct initial positioning inside the new geometry.
+              For the most visible door-flow oscillations, use <strong>Slit</strong> with ~40-60 agents and slit width around 30-50 px.
             </p>
           </section>
         </aside>
