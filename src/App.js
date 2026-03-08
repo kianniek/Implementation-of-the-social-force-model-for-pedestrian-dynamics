@@ -13,6 +13,7 @@ const App = () =>
   const [activeMap, setActiveMap] = useState('narrow');
   const [envParams, setEnvParams] = useState({
     corridorWidth: 60,
+    slitWidth: 60,
   });
 
   const [params, setParams] = useState({
@@ -21,16 +22,26 @@ const App = () =>
     v0_std: 0.26,
     V0_ab: 2.1,
     sigma: 0.3,
-    U0_aB: 12.0,
+    U0_aB: 10.0,
     R: 0.2,
     c: 0.5,
     phi: 100,
-    maxSpeedMultiplier: 1.5,
+    maxSpeedMultiplier: 1.3,
     dt: 0.05
   });
 
   const agentsRef = useRef([]);
   const wallsRef = useRef([]);
+
+  // Box-Muller transform for Gaussian random numbers
+  const gaussianRandom = (mean, std) =>
+  {
+    let u1 = Math.random();
+    let u2 = Math.random();
+    while (u1 === 0) u1 = Math.random();
+    const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+    return mean + std * z;
+  };
 
   const initSimulation = () =>
   {
@@ -48,10 +59,34 @@ const App = () =>
 
   const createNewAgent = (id, width) =>
   {
+    const speed = Math.max(0.1, gaussianRandom(params.v0, params.v0_std));
+
+    if (activeMap === 'crossing') {
+      const hw = envParams.corridorWidth / 2;
+      const isVertical = id % 2 === 0;
+      const direction = (Math.floor(id / 2)) % 2 === 0 ? 1 : -1;
+      let x, y;
+      if (isVertical) {
+        x = 400 + (Math.random() - 0.5) * (hw * 1.2);
+        y = direction === 1 ? Math.random() * 60 : 400 - Math.random() * 60;
+      } else {
+        x = direction === 1 ? Math.random() * 150 : width - Math.random() * 150;
+        y = 200 + (Math.random() - 0.5) * (hw * 1.2);
+      }
+      const colors = { xPos: '#3b82f6', xNeg: '#ef4444', yPos: '#22c55e', yNeg: '#f59e0b' };
+      const colorKey = isVertical ? (direction === 1 ? 'yPos' : 'yNeg') : (direction === 1 ? 'xPos' : 'xNeg');
+      return {
+        id, pos: { x, y },
+        vel: isVertical ? { x: 0, y: direction * speed } : { x: direction * speed, y: 0 },
+        desiredSpeed: speed, direction, axis: isVertical ? 'y' : 'x',
+        color: colors[colorKey],
+        forces: { social: { x: 0, y: 0 }, wall: { x: 0, y: 0 }, target: { x: 0, y: 0 } }
+      };
+    }
+
     const direction = id % 2 === 0 ? 1 : -1;
     const x = direction === 1 ? Math.random() * 150 : width - Math.random() * 150;
     const y = 120 + Math.random() * 160;
-    const speed = params.v0 + (Math.random() - 0.5) * params.v0_std * 2;
 
     return {
       id: id,
@@ -59,6 +94,7 @@ const App = () =>
       vel: { x: direction * speed, y: 0 },
       desiredSpeed: speed,
       direction: direction,
+      axis: 'x',
       color: direction === 1 ? '#3b82f6' : '#ef4444',
       forces: { social: { x: 0, y: 0 }, wall: { x: 0, y: 0 }, target: { x: 0, y: 0 } }
     };
@@ -66,10 +102,34 @@ const App = () =>
 
   const updateWalls = () =>
   {
-    let walls = [
+    let walls = [];
+
+    if (activeMap === 'crossing') {
+      const cx = 400, cy = 200;
+      const hw = envParams.corridorWidth / 2;
+      // horizontal corridor walls (left arm, right arm)
+      walls.push(
+        { x1: 0, y1: cy - hw, x2: cx - hw, y2: cy - hw },
+        { x1: 0, y1: cy + hw, x2: cx - hw, y2: cy + hw },
+        { x1: cx + hw, y1: cy - hw, x2: 800, y2: cy - hw },
+        { x1: cx + hw, y1: cy + hw, x2: 800, y2: cy + hw }
+      );
+      // vertical corridor walls (top arm, bottom arm)
+      walls.push(
+        { x1: cx - hw, y1: 0, x2: cx - hw, y2: cy - hw },
+        { x1: cx + hw, y1: 0, x2: cx + hw, y2: cy - hw },
+        { x1: cx - hw, y1: cy + hw, x2: cx - hw, y2: 400 },
+        { x1: cx + hw, y1: cy + hw, x2: cx + hw, y2: 400 }
+      );
+      wallsRef.current = walls;
+      return;
+    }
+
+    // default top/bottom boundary for non-crossing maps
+    walls.push(
       { x1: 0, y1: 80, x2: 800, y2: 80 },
-      { x1: 0, y1: 320, x2: 800, y2: 320 },
-    ];
+      { x1: 0, y1: 320, x2: 800, y2: 320 }
+    );
 
     if (activeMap === 'narrow') {
       const centerY = 200;
@@ -81,6 +141,14 @@ const App = () =>
         { x1: 380, y1: centerY + hw, x2: 420, y2: centerY + hw },
         { x1: 420, y1: centerY - hw, x2: 500, y2: 80 },
         { x1: 420, y1: centerY + hw, x2: 500, y2: 320 }
+      );
+    } else if (activeMap === 'centerWall') {
+      const centerX = 400;
+      const centerY = 200;
+      const halfSlit = envParams.slitWidth / 2;
+      walls.push(
+        { x1: centerX, y1: 80, x2: centerX, y2: centerY - halfSlit },
+        { x1: centerX, y1: centerY + halfSlit, x2: centerX, y2: 320 }
       );
     } else if (activeMap === 'boxes') {
       const boxes = [
@@ -117,8 +185,16 @@ const App = () =>
 
   useEffect(() =>
   {
+    agentsRef.current = agentsRef.current.map(a => ({
+      ...a,
+      desiredSpeed: Math.max(0.1, gaussianRandom(params.v0, params.v0_std))
+    }));
+  }, [params.v0]);
+
+  useEffect(() =>
+  {
     initSimulation();
-  }, [activeMap, envParams.corridorWidth]);
+  }, [activeMap, envParams.corridorWidth, envParams.slitWidth]);
 
   const updateSimulation = () =>
   {
@@ -131,9 +207,14 @@ const App = () =>
     {
       let totalForce = { x: 0, y: 0 };
 
-      const targetX = a.direction === 1 ? 950 : -150;
-      const dx = targetX - a.pos.x;
-      const dy = 200 - a.pos.y;
+      let dx, dy;
+      if (a.axis === 'y') {
+        dx = 400 - a.pos.x;
+        dy = (a.direction === 1 ? 450 : -50) - a.pos.y;
+      } else {
+        dx = (a.direction === 1 ? 950 : -150) - a.pos.x;
+        dy = 200 - a.pos.y;
+      }
       const distToTarget = Math.sqrt(dx * dx + dy * dy);
       const e = { x: dx / distToTarget, y: dy / distToTarget };
 
@@ -203,8 +284,13 @@ const App = () =>
         y: a.pos.y + nextVel.y * params.dt * 20
       };
 
-      if (nextPos.x > 850) nextPos.x = -50;
-      if (nextPos.x < -50) nextPos.x = 850;
+      if (a.axis === 'y') {
+        if (nextPos.y > 450) nextPos.y = -50;
+        if (nextPos.y < -50) nextPos.y = 450;
+      } else {
+        if (nextPos.x > 850) nextPos.x = -50;
+        if (nextPos.x < -50) nextPos.x = 850;
+      }
 
       return { ...a, pos: nextPos, vel: nextVel, forces: { social: f_social, wall: f_wall, target: f_target } };
     });
@@ -311,11 +397,19 @@ const App = () =>
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-slate-500 font-medium mb-2 block">Map Scenario</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   <button
                     onClick={() => setActiveMap('narrow')}
                     className={`text-xs py-2 rounded-md border transition ${activeMap === 'narrow' ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}
                   >Narrow</button>
+                  <button
+                    onClick={() => setActiveMap('centerWall')}
+                    className={`text-xs py-2 rounded-md border transition ${activeMap === 'centerWall' ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}
+                  >Slit</button>
+                  <button
+                    onClick={() => setActiveMap('crossing')}
+                    className={`text-xs py-2 rounded-md border transition ${activeMap === 'crossing' ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}
+                  >Crossing</button>
                   <button
                     onClick={() => setActiveMap('boxes')}
                     className={`text-xs py-2 rounded-md border transition ${activeMap === 'boxes' ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}
@@ -327,13 +421,25 @@ const App = () =>
                 </div>
               </div>
 
-              {activeMap === 'narrow' && (
+              {(activeMap === 'narrow' || activeMap === 'crossing') && (
                 <div>
                   <label className="text-sm flex justify-between items-center mb-1">
                     Corridor Width: <span>{envParams.corridorWidth}px</span>
                   </label>
                   <input type="range" min="20" max="150" step="5" value={envParams.corridorWidth}
                     onChange={e => setEnvParams({ ...envParams, corridorWidth: parseInt(e.target.value) })}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                </div>
+              )}
+
+              {activeMap === 'centerWall' && (
+                <div>
+                  <label className="text-sm flex justify-between items-center mb-1">
+                    Slit Width: <span>{envParams.slitWidth}px</span>
+                  </label>
+                  <input type="range" min="20" max="200" step="5" value={envParams.slitWidth}
+                    onChange={e => setEnvParams({ ...envParams, slitWidth: parseInt(e.target.value) })}
                     className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                 </div>
@@ -387,6 +493,27 @@ const App = () =>
                 </label>
                 <input type="range" min="0" max="30" step="1" value={params.U0_aB}
                   onChange={e => setParams({ ...params, U0_aB: parseFloat(e.target.value) })}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm flex justify-between">
+                  Desired Speed (<InlineMath math="v^0_\\alpha" />): <span>{params.v0} m/s</span>
+                </label>
+                <input type="range" min="0.5" max="3.0" step="0.1" value={params.v0}
+                  onChange={e => setParams({ ...params, v0: parseFloat(e.target.value) })}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm flex justify-between">
+                  Rear Perception (<InlineMath math="c" />): <span>{params.c}</span>
+                </label>
+                <p className="text-xs text-slate-400 mb-1">Influence weight for stimuli outside the field of view (0 = ignore, 1 = full)</p>
+                <input type="range" min="0" max="1" step="0.05" value={params.c}
+                  onChange={e => setParams({ ...params, c: parseFloat(e.target.value) })}
                   className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
               </div>
