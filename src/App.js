@@ -430,7 +430,7 @@ const App = () =>
             ref={canvasRef}
             width={800}
             height={400}
-            className="w-full h-full lg:h-auto bg-white rounded border border-slate-200"
+            className="w-full h-auto max-h-full bg-white rounded border border-slate-200"
           />
         </div>
 
