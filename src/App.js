@@ -171,6 +171,42 @@ const App = () =>
           { x1: b.x + b.w, y1: b.y, x2: b.x + b.w, y2: b.y + b.h }
         );
       });
+    } else if (activeMap === 'demo') {
+      // Letter D (x: 150-230)
+      walls.push(
+        { x1: 150, y1: 140, x2: 150, y2: 260 },
+        { x1: 150, y1: 140, x2: 210, y2: 140 },
+        { x1: 210, y1: 140, x2: 230, y2: 160 },
+        { x1: 230, y1: 160, x2: 230, y2: 240 },
+        { x1: 230, y1: 240, x2: 210, y2: 260 },
+        { x1: 210, y1: 260, x2: 150, y2: 260 }
+      );
+      // Letter E (x: 260-330)
+      walls.push(
+        { x1: 260, y1: 140, x2: 260, y2: 260 },
+        { x1: 260, y1: 140, x2: 330, y2: 140 },
+        { x1: 260, y1: 200, x2: 320, y2: 200 },
+        { x1: 260, y1: 260, x2: 330, y2: 260 }
+      );
+      // Letter M (x: 360-480)
+      walls.push(
+        { x1: 360, y1: 140, x2: 360, y2: 260 },
+        { x1: 360, y1: 140, x2: 400, y2: 180 },
+        { x1: 400, y1: 180, x2: 440, y2: 140 },
+        { x1: 440, y1: 140, x2: 440, y2: 260 },
+        { x1: 400, y1: 180, x2: 400, y2: 220 }
+      );
+      // Letter O (x: 470-550)
+      walls.push(
+        { x1: 490, y1: 140, x2: 530, y2: 140 },
+        { x1: 530, y1: 140, x2: 550, y2: 160 },
+        { x1: 550, y1: 160, x2: 550, y2: 240 },
+        { x1: 550, y1: 240, x2: 530, y2: 260 },
+        { x1: 530, y1: 260, x2: 490, y2: 260 },
+        { x1: 490, y1: 260, x2: 470, y2: 240 },
+        { x1: 470, y1: 240, x2: 470, y2: 160 },
+        { x1: 470, y1: 160, x2: 490, y2: 140 }
+      );
     }
     wallsRef.current = walls;
   };
@@ -443,7 +479,7 @@ const App = () =>
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-slate-500 font-medium mb-2 block">Map Scenario</label>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => setActiveMap('narrow')}
                     className={`text-xs py-2 rounded-md border transition ${activeMap === 'narrow' ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}
@@ -464,6 +500,10 @@ const App = () =>
                     onClick={() => setActiveMap('open')}
                     className={`text-xs py-2 rounded-md border transition ${activeMap === 'open' ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}
                   >Open</button>
+                  <button
+                    onClick={() => setActiveMap('demo')}
+                    className={`text-xs py-2 rounded-md border transition ${activeMap === 'demo' ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}
+                  >DEMO</button>
                 </div>
               </div>
 
